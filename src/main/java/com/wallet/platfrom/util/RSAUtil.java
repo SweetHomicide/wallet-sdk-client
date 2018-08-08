@@ -1,0 +1,112 @@
+package com.wallet.platfrom.util;
+
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
+import java.security.Key;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * RSA非对称加密解密方法类
+ * 
+ * @author LiuQing
+ */
+public final class RSAUtil {
+
+	private static final Map<String, String> KEY_MAP = new HashMap<String, String>();
+	
+	public static void makeKeyFile(String publicKeyFile, String privateKeyFile) {
+		KeyPairGenerator keyPairGen = null;
+		try {
+			keyPairGen = KeyPairGenerator.getInstance("RSA");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		if (null != keyPairGen) {
+			keyPairGen.initialize(1024); // 密钥大小1024位
+			KeyPair keyPair = keyPairGen.generateKeyPair();
+			write2KeyFile(privateKeyFile, keyPair.getPrivate());
+			write2KeyFile(publicKeyFile, keyPair.getPublic());
+		}
+	}
+
+	public static RSAResult encript(String keyFile, String data, String charset) throws Exception {
+		if (null == KEY_MAP.get(keyFile)) {
+			KEY_MAP.put(keyFile, RSACoder.getKey(keyFile));
+		}
+		String privateKey = KEY_MAP.get(keyFile);
+		boolean useCharset = (null != charset && charset.trim().length() > 0);
+
+		byte[] datas = useCharset ? data.getBytes(charset) : data.getBytes();
+		byte[] encodedData = RSACoder.encryptByPrivateKey(datas, privateKey);
+		RSAResult result = new RSAResult();
+		result.setData(RSACoder.bytes2Hex(encodedData));
+		result.setSign(RSACoder.sign(encodedData, privateKey));
+		return result;
+	}
+
+	public static RSAResult decript(String keyFile, String data, String sign, String charset) throws Exception {
+		if (null == KEY_MAP.get(keyFile)) {
+			KEY_MAP.put(keyFile, RSACoder.getKey(keyFile));
+		}
+		String publicKey = KEY_MAP.get(keyFile);
+		boolean useCharset = (null != charset && charset.trim().length() > 0);
+
+		RSAResult result = new RSAResult();
+		byte[] encodedData = RSACoder.hex2Bytes(data);
+		result.setSignRight(RSACoder.verify(encodedData, publicKey, sign));
+		if (result.isSignRight()) {
+			byte[] decodedData = RSACoder.decryptByPublicKey(encodedData, publicKey);
+			result.setData(useCharset ? new String(decodedData, charset) : new String(decodedData));
+		}
+		return result;
+	}
+
+	private static void write2KeyFile(String keyFile, Key key) {
+		ObjectOutputStream oos = null;
+		FileOutputStream fos = null;
+		try {
+			fos = new FileOutputStream(keyFile);
+			oos = new ObjectOutputStream(fos);
+			oos.writeObject(key);
+			oos.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			if (null != fos) {
+				try {
+					fos.close();
+				} catch (Exception e) {
+				}
+				fos = null;
+			}
+			if (null != oos) {
+				try {
+					oos.close();
+				} catch (Exception e) {
+				}
+				oos = null;
+			}
+		}
+	}
+
+	public static void main(String[] args) throws Exception {
+		String privateKeyFile = "C:\\Users\\LiuQing\\Documents\\test_private.key";
+		String publicKeyFile = "C:\\Users\\LiuQing\\Documents\\test_public.key";
+		//makeKeyFile(publicKeyFile, privateKeyFile);
+		
+		String data = "symbol=LKC&addresses=哈哈哈哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈,哈哈哈啊哈哈哈";
+		RSAResult result = encript(privateKeyFile, data, null);
+		System.out.println("加密 sign <== " + result.getSign());
+		System.out.println("加密 data <== " + result.getData());
+		
+		//String data = "1087cc18decaf7571080536aa98c5b5c53073b278e2467c85976a789d9d97f760ce01ec40d75d6d08567d5c818d2bf6ba8a48a4f7aa026f1964a59fa4bf5443d5b398c0747a9b2b7a0970f8f79dfd202dd9651e5f9e244db9aa3f16fa2bd50bf60a48e7f48b81317f7fa7a46bec2277129f2d4dbdec24ef2e22327c6f4566b20567246187c1c6949c305652b9b00f3b7efdade4d1e4c36a98f3cc412f5de6fa5fa99f902165fbfc6857c39e34fbd30054c4bc88a43c0eb0bb65fab973dfaa2dca5f7d441de990cfcddfde300bf5b5472621b7f6c82faeef36eb7ff99ea50f067b7880c4e8e535ee9fd9bb6128993dbe9ad84eec12b4f4c1f6a642be68a7070fe7aaaf417fe30f45d1f79a51f68b80f90b545073d7d5ad60a714928e5ae80eea1c0e46550775b754ed389878d0a5781c94b56d2ef482386ffc02f9357c33ddf90b078ce27ab26c51c0abe87550f7434968723ef5c184c3f2243f3dc1c4cc253025b3f559582aaaf8794cf33f96f80ef458e38b27b00444d2732ca70ad72c087c3965b123af86ad0ce4d27a541f5a649cb8d0e7947a3c5f580bbdff58652eeb9d0d0ee5d221665d2ffd68c338d5e5b5c7d6ac7af14ca93d87881cb1a5dade7ba1f386c01cb06fd055856a49e79f28a845a41b5d90c78b809755356f0e13c8d6cd0ce5fa90028d7d80c59af4809133d7aa07740a263519fd4a1b7bad1b4b30e53db2de2583e24cb9b57678c769170a65a54277fb2e20344de4e24c7c5a41d531b4b4659c98d23f47a99caafa28e2b0646c27a74a12f6dabea8f6f0c9ebf266c927bb495bc3775756e1bc828b9fd37c41ae4728c152ac6b2e09d26f14eb14760391d952396523edb5bb71a6aab206ac905d35c8dd13928a6fee22974fba1d1739bc42c1cec9d895686f3dc3eb685fe0986860dedc7766cfdf3c5b3d4dc1831a1eae65662d034060ec544bb602036332a853b9e778a78815d0ebbe38a477b9f8be0d9bdcf7b1e1da8732c22b9865e571a7258dc3b4525bb76e84728bacc74b038fde14112a49459a2478ad604ab41557708ee365393d9d1d8782e87e2f22b92ce92dab9029c308d2732f2e30b63e63e86c3c658d36cc432425368d59d6c15947ef919877a686ca61043b9063d9fe7a449557bc47d81612ba769a7ec29862cdfec1eacb7139aa913d6e4744dea266ec7487ad433e3a56857b68ab51f2dceda15a329ae36d852f26f0120974883d339b08b19ae095ecc3d26661956da59e4c87e17648d684d1f5eb48f7be524df95a1a6083a0c97840d00ed1b6751e5951b9d72a6b9144a978892f1e491c68b40f00252522fcc40c04aeee36087b54e88a0958619629a059395ce0d3a53a864e99e8add438bbb4dc7f51f7c91658ce2989cafd74cdd9f87e61b67cbea3661e59607afebedcfaec1b6faa6fc48bc93c25bade63c55a4b5a0eaec2eedcfa7e970d798d0906a68add89e6e34b6ac67586498888948059dd1d4e55c04b4030e77b639a73489ea92c62ce3ee595085dd07b97bc88e0d258e2e08097b27d93cfe2c11fa93d35bb6a1892786cabcb0b48249a19173798e8cd5d6a2d04f4246f6e2ef6251808216531c822d772ba5917fb60f16259427e638960923a958f763c3870e202087f26557f9f3e2808dccdec3fd8f312526929883922ff6c4df59344017e0b7c596be914a644368527b11d6e679bcbe3eb85ae5c28213f2489eff4ceb4681b351e83530344dd58e00995daeb4b0879e8b009efdcbee55d5c9bc410a47b83c906237d705ce57d4ed18a032ee721030e44bc3c69f35b8e97e395ae7669a7950b052a4f47c7b3ce119476985dcf3a15d7d95babebaf853bdacbcce160c29cc90b60c83919345668103542907a69525e989bca0f7193043ca0e85ea9953d9330b9dffa4edf40388f391943aad6911724fa5477360b0e11ffa9c460d31a5f0bfea766a77c1d7f61c9262c64fa96264d66dcd3c2066cb2f32946e1a3c77e6584d450e6989b09e078551931f629dee9e83a4ae71b8e1b66ab7178a3775318eff7ec2f3333a95008444fb838771cb4a0142729dd1f12e30ec710b181ae1e32251b2cfe1eeb55e4bb36cc17468766c0f8a1e535d2b987359d688bd2faa46bf7f2e3e65a647271106f69ba8da8b7293a15f10afe8e131a8c57bbba486cfa84867109537829a1452639d7fb25085d4a5ca9a0ff83bcd5af4fe881aaca6b9560ddbe353a847980352c82135e2f723f1cabde208e00d0823488d22f8fadcca1d59f55051a29cb6c9a8db2c233e5e1a267b0d8bb7e7819229f23fb888ff032b424438a0d42e70596a104350df4add8c8b1adc5d7e4ad040157b6682528d7fa51b222f684be4c6bf67eb6978225274189020f15007aaa0813280bc2468e4792cad3c3d843d9bdc3b43b09e2a501437ae0fe704f7197c51d12165ff1e60ec04640666fc99149c416eeece394ffbdae6e78f65b905033e502b98e3bda5299b48d6ab1f5ca3e06e85e2c99e1e334f6d82c8e898dfe86a5cf765f74c4d00b7aea9699bd64c103c67657e7d081246c9bf8628e818af8ec7c94355f884fe93f170dfc352e1e9a7bdfcefea6169a85f46cc3e6307134a38ec10f9dc2aebaaba372977735354a93e45e06b7fb7c6cda3de0019cf061c638a666bdce23b0391de5e102c61410a398d27c8cd14e15b40fa78c7d9a125f07c773b81458bae055aa5e2c3ba27c0e10e0b6be0e3c57f08ab82a5bb99a704fd4477fb109bae3f817040e1f71166625b84ba00504f5e3c1653418c83680b90846a068ace4ba97e8aea08a95d5279caaa2f308196da1378b31c75a128411460dcef2d83e29de06ff7eb47d63814a6cd3ffca9bee604b56a48f8cca594d94aa2106e9a52b838250b703e1aa4da8b8274e61ca4a364d731010898ea1442aa3b0cc25ccff6ccb34740b8a4adfb368d46f87086871bb74fe7b6b435e45940c0823388216e8623da774c68329b9383df6ba697435893963845495e05e9d887d66a8d1a086da8bafb38fa53f92a084cd064f12714685c73a9b072cb6e8a0d6e17e33eb28aa327738e4308bec706fb867d955d9fe5146564c507c232d0cdc42fe3ea924342475e1a64f9da4619b0d6fd0b4f484104e6b7bdfda7ea5a103fffd8a31f8df969d68c5a21e113efda0547bf3135a0b2837a24a9ad044ede941c916f26a11c6c4521bcd46057b70361e948806058ed8a87fd8efbf5e9ae5d017118f0ed02a21299e2c16eb5face62edcfd5c51894d5be61485e7a9f8cb5f6ab0b8bac60f88cc023f44c5c650ad214307cc05c65a35dc3758f7558c93a22f71fac5d558f418cf1b11acd482dd7927a98b1db16d37c087f46dd148de6ac82d2229f8fa5fc459b4abb5347a520396503a43f60790c360b06ab45ea451c50c23b6dacf146a5cdbd306698d5047de5892996e1aca90b3aa368b88c6f9b7e8545450ccc4f3d475749a54929a8dd7775fd2e1d1466a1e2e119bfc621013c037eb4732f75c9dcb128cfd675bc149a53031bf12dd9b5ec6851a13e3ece3d94ade8b394076a8244d85060cb1b4bc756ae3fc5788ff4c66f79b95372d84bcf83810a1c1fc0dfe57dc5bbdc0003603e0379e585ba44aeaddfa2bbaecb5f53ec6eb61cfd97e14a3cd1267841953515f4a2252b0b7a7109299de0440a3fcc1b53da073e06851b1286c3c2e7c8c952dc522ad9457639da38f2af4de530aef502bb9bc34d609f8a5581e6fb47753a1a1acbb4118d7e0795c007765b2ebc0f783eb46b2946196d9fc26c0ef35ce9960364b9d101d3702d7dd8bd9f138ec9e4243d67a69644d982c6a7dcfb35334e97d95b43abe96448cbd1e3c4322577924b5f0d908de07c5af745ef0cc1f079192dbb90f6c270e830533caa4ce085a3e2bee942ed36fba2d1d9135fbcc592ba36aa586b79d92d8b86b4f4e0ebdd011a4e57354bd4974c1ec4d2014d8c4c6147251f7eaa77740ef20a95ee584b4d32ced0bccdef3a2ca304a316b7643eb9564c6e90eacfa86167e5cebc83ae5054950d25aa79ce8ac063703980f4539e2b622ccb58dddf2d98a34fd0dec56ecb50cddec483f55040e927ad341d2df19a6747de74ebed9d383a636c004504e9bea802de70772fc807254420ce6791c687405f6d47c2a26788550106f1d2313cf5e639d1f5673a9d6b55ea047fd6d8497d643f5d0a6522223737bd4bd1eb9bd862b8d21a6790615b8eacb77f1852cb6a6d8e4b2edaaa2c4a430368814f985733d9b71c526570cfe561adbb6d31bb1736390b8579de03345c52c7cbbcd266a9bff755e9928d78867d45bc28a3dbfa3ff57a7af533522a86d1d39556ee8cd6d964fbbc3975fc21bc27742eef8cb0e485d1a1769ebc7bdfeb99c59a43914fd0a1114d14403e74d1be155cb51f1cb3098bd696843264bfa0868388eb5aa01a4091b9eee0684cb0910a46b5e970c871bab6355337f6aabb0d68807e1ef5c93b521380e6defa537792ac27aa3d8843267e1547d650ff445e4739ed00d4326074448209665da8336ac86ee43eacbb6c76840320528ba3a239f35d56b84408445408b0052d6a89afe23d52f116e380856d09081c7df80923d799fe714521827c682d25701f8b43bf927cffd70925b42c8da6779a389db6dc407f62eca0f8404eb091659742b97cd2d7214761965f528360b0a33341349fa51a0af5688bf6aa3ddca5e4ed999b6aa8c76c5a744d601786d008ca5471583c6eccd6f1b8185d824a621da1e5468c9af3bac3a910413a4b7e802e3ca71a5540b933c37464201246a40ec2e0de2150a28f8dca844f7f71ba03f325d87e7e653801d0362f0d4098b353af6c087ed72c81f4eb99f6f83d759064758f35771a5bde9322ade4234bbedf1eb4c1c1e5629b6949f9f65f5cf0150e88604a7b1172e5fa73d85a7d01f1cb76f00ddcecc8342667a00c83c3d439e25e9a375b01cf710ef61d1cdb8a270e6d3157d2f1659e074c81a3aae8d1f64c0e04fd43b4cd814dbd045cd18508715659c8401426f66770b12b0dcfd7b98e8e7aa9dafcf5a32d08418fd9b5f5280cb4c86661f55a696c7eaeb83b9480d34598020146c0f9233b79189f6b4ae6f646bcfde72a17cbc0756025bf36899d0e7c05b26fc7bfe98ede46139c42b64ea5444bafe3434b9152d1d8255e818cc8879b27bd648dbb9d0d5f78f6a4fdd799ffa5f4dc73941c0193898c1c4aa855c5aa2f662ebd9873a0272465ffa7abb804b2a4c1d92fb6fea2130372d658fb0ed15b4ad2fac3dffa5933d8d84f3aa1a7485b72f95a48298c3bce57cf5f446c5e23e9d436cded71650c0b3e61c5b9b1ac1dc224394a86dfbe0e1dfebbb0a5275e0e1de79ba1dca1a05dc30e2aa1cd95fae31c507df80e05edbf7565f34837ba68ce21a926991cad3b6ddcd33fefae9917081c213bf89f9416d9c817756172a914a9d218dbbfd03e56ae79523d7bc6a63c6114d270125ef94b1f27d83e91ff6194b6649278d47140b0945ca61820ea9c72ea2423241206e836f2c25976781ca29e2afc21096d7efe0e8a2bbad3db415b1f10769028cb64c8ed82e38ec27e06eda8572bfa688eea5b7166bbf260aff536f46c8397b4342d926483ad246880";
+		//String sign = "3dc63f829f9f05ef0050080781a34932cd12f0daf59b3c2b4cc4d16b56b0067d166d78dd9af4c9d396883f4f137880665d04246c94f875df8b6aa5c4842b8a73fb5986754c838541095dbdfc5cd7ad572e458593baffab0d090a8654e155b4b17ebc5ce2148142cf540ae9ef6a7dee81f0d73ba5be011f214064118d07c3e89c";
+		RSAResult result2 = decript(publicKeyFile, result.getData(), result.getSign(), null);
+		System.out.println("解密 isSignRight ==> " + result2.isSignRight());
+		System.out.println("解密 data ==> " + result2.getData());
+	}
+}
